@@ -1,0 +1,181 @@
+<dashboard version="1.1">
+  <label>SOC Overview — Splunk Lab</label>
+  <description>Real-time security monitoring dashboard for splunk-soc-lab</description>
+
+  <!-- ── Row 1: KPI Counters ──────────────────────────────── -->
+  <row>
+    <panel>
+      <single>
+        <title>SSH Brute Force Attempts (24h)</title>
+        <search>
+          <query>
+            index=main sourcetype=linux_secure "Failed password"
+            | rex "from (?P<src_ip>\d+\.\d+\.\d+\.\d+)"
+            | stats count
+          </query>
+          <earliest>-24h</earliest>
+          <latest>now</latest>
+        </search>
+        <option name="colorBy">value</option>
+        <option name="colorMode">block</option>
+        <option name="rangeColors">["0x53a051","0xf8be34","0xdc4e41"]</option>
+        <option name="rangeValues">[0,10]</option>
+        <option name="useColors">1</option>
+      </single>
+    </panel>
+
+    <panel>
+      <single>
+        <title>Port Scan Events (24h)</title>
+        <search>
+          <query>
+            index=main sourcetype=syslog "PORT_SCAN"
+            | stats count
+          </query>
+          <earliest>-24h</earliest>
+          <latest>now</latest>
+        </search>
+        <option name="colorBy">value</option>
+        <option name="colorMode">block</option>
+        <option name="rangeColors">["0x53a051","0xf8be34","0xdc4e41"]</option>
+        <option name="rangeValues">[0,100]</option>
+        <option name="useColors">1</option>
+      </single>
+    </panel>
+
+    <panel>
+      <single>
+        <title>Auth Failures (24h)</title>
+        <search>
+          <query>
+            index=main sourcetype=linux_secure
+            ("authentication failure" OR "Failed password")
+            | stats count
+          </query>
+          <earliest>-24h</earliest>
+          <latest>now</latest>
+        </search>
+        <option name="colorBy">value</option>
+        <option name="colorMode">block</option>
+        <option name="rangeColors">["0x53a051","0xf8be34","0xdc4e41"]</option>
+        <option name="rangeValues">[0,5]</option>
+        <option name="useColors">1</option>
+      </single>
+    </panel>
+
+    <panel>
+      <single>
+        <title>New Users Created (24h)</title>
+        <search>
+          <query>
+            index=main sourcetype=linux_secure "new user"
+            | stats count
+          </query>
+          <earliest>-24h</earliest>
+          <latest>now</latest>
+        </search>
+        <option name="colorBy">value</option>
+        <option name="colorMode">block</option>
+        <option name="rangeColors">["0x53a051","0xdc4e41"]</option>
+        <option name="rangeValues">[0]</option>
+        <option name="useColors">1</option>
+      </single>
+    </panel>
+  </row>
+
+  <!-- ── Row 2: Timeline Charts ───────────────────────────── -->
+  <row>
+    <panel>
+      <chart>
+        <title>SSH Failed Logins Over Time</title>
+        <search>
+          <query>
+            index=main sourcetype=linux_secure "Failed password"
+            | rex "from (?P<src_ip>\d+\.\d+\.\d+\.\d+)"
+            | timechart count by src_ip
+          </query>
+          <earliest>-24h</earliest>
+          <latest>now</latest>
+        </search>
+        <option name="charting.chart">line</option>
+        <option name="charting.legend.placement">bottom</option>
+      </chart>
+    </panel>
+
+    <panel>
+      <chart>
+        <title>Port Scan Activity Over Time</title>
+        <search>
+          <query>
+            index=main sourcetype=syslog "PORT_SCAN"
+            | rex "SRC=(?P<src_ip>\d+\.\d+\.\d+\.\d+)"
+            | timechart count by src_ip
+          </query>
+          <earliest>-24h</earliest>
+          <latest>now</latest>
+        </search>
+        <option name="charting.chart">area</option>
+      </chart>
+    </panel>
+  </row>
+
+  <!-- ── Row 3: Top Attackers ─────────────────────────────── -->
+  <row>
+    <panel>
+      <table>
+        <title>Top Attacker IPs</title>
+        <search>
+          <query>
+            index=main sourcetype=linux_secure "Failed password"
+            | rex "from (?P<src_ip>\d+\.\d+\.\d+\.\d+)"
+            | stats count as "Attempts" by src_ip
+            | sort -Attempts
+            | head 10
+          </query>
+          <earliest>-24h</earliest>
+          <latest>now</latest>
+        </search>
+      </table>
+    </panel>
+
+    <panel>
+      <table>
+        <title>Detected Port Scans by Source</title>
+        <search>
+          <query>
+            index=main sourcetype=syslog "PORT_SCAN"
+            | rex "SRC=(?P<src_ip>\d+\.\d+\.\d+\.\d+).*DPT=(?P<dest_port>\d+)"
+            | bin _time span=60s
+            | stats dc(dest_port) as "Unique Ports" by src_ip, _time
+            | where 'Unique Ports' > 10
+            | sort -"Unique Ports"
+          </query>
+          <earliest>-24h</earliest>
+          <latest>now</latest>
+        </search>
+      </table>
+    </panel>
+  </row>
+
+  <!-- ── Row 4: Recent Events ──────────────────────────────── -->
+  <row>
+    <panel>
+      <table>
+        <title>Recent Security Events (All Sources)</title>
+        <search>
+          <query>
+            index=main (sourcetype=linux_secure OR sourcetype=syslog)
+            ("Failed password" OR "PORT_SCAN" OR "new user" OR "authentication failure")
+            | table _time, host, sourcetype, _raw
+            | sort -_time
+            | head 20
+          </query>
+          <earliest>-24h</earliest>
+          <latest>now</latest>
+        </search>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+
+</dashboard>

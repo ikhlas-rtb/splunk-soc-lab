@@ -1,0 +1,16 @@
+# Logs
+logs/*.log
+/tmp/
+
+# Credentials (never commit these)
+*.env
+secrets.txt
+telegram-config.txt
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+*.swp

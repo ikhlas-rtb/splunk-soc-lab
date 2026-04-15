@@ -1,0 +1,47 @@
+# ============================================================
+# detection-rules.spl — Splunk SOC Lab Detection Rules
+# All 6 SPL queries used as Saved Alerts in Splunk
+# ============================================================
+
+# ── Rule 1: SSH Brute Force (MITRE T1110.001) ───────────────
+# Triggers when >5 failed SSH logins from same IP in 60 seconds
+index=main sourcetype=linux_secure "Failed password"
+| rex "from (?P<src_ip>\d+\.\d+\.\d+\.\d+)"
+| bin _time span=60s
+| stats count by _time, src_ip
+| where count > 5
+
+# ── Rule 2: Port Scan (MITRE T1046) ─────────────────────────
+# Triggers when >15 unique destination ports hit in 60 seconds
+index=main sourcetype=syslog "PORT_SCAN"
+| rex "SRC=(?P<src_ip>\d+\.\d+\.\d+\.\d+).*DPT=(?P<dest_port>\d+)"
+| bin _time span=60s
+| stats dc(dest_port) as unique_ports by _time, src_ip
+| where unique_ports > 15
+
+# ── Rule 3: Sudo/Auth Failure (MITRE T1548.003) ─────────────
+# Triggers on repeated sudo/authentication failures
+index=main sourcetype=linux_secure ("authentication failure" OR "Failed password" OR "sudo")
+| rex "user=(?P<user>\w+)"
+| stats count by user, host
+| where count > 3
+
+# ── Rule 4: New User Created (MITRE T1136.001) ──────────────
+# Triggers when a new user account is created
+index=main sourcetype=linux_secure "new user"
+| rex "name=(?P<new_user>\w+)"
+| table _time, host, new_user
+
+# ── Rule 5: Unusual Outbound Traffic (MITRE T1041) ──────────
+# Triggers on high volume outbound traffic (requires netflow data)
+index=main sourcetype=syslog
+| stats sum(bytes_out) as total_bytes by src_ip
+| where total_bytes > 10000000
+
+# ── Rule 6: SYN Flood DDoS (MITRE T1498.001) ────────────────
+# Triggers when SYN flood rate exceeds 1000 packets/min from same IP
+index=main sourcetype=syslog "PORT_SCAN"
+| rex "SRC=(?P<src_ip>\d+\.\d+\.\d+\.\d+)"
+| bin _time span=60s
+| stats count by _time, src_ip
+| where count > 1000
